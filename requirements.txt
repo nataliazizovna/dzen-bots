@@ -1,1 +1,1 @@
-TOKEN = os.getenv("dzen_publications_bot")
+python-telegram-bot==22.7
