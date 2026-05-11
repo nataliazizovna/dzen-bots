@@ -1,0 +1,106 @@
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+
+import os
+
+TOKEN = os.getenv("dzen_publications_bot")
+
+ACCESS_CODE = "8381"
+
+authorized_users = set()
+
+GROUPS = {
+    "india": -1003261155661,
+    "вьетнам": -1003984357381,
+}
+
+CHANNELS = {
+    "global": "@DzenObmenGlobal",
+}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🔐 Введите код доступа:"
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    text = update.message.text
+
+    if user_id not in authorized_users:
+        if text == ACCESS_CODE:
+            authorized_users.add(user_id)
+
+            await update.message.reply_text(
+                "✅ ДОСТУП РАЗРЕШЕН\n\n"
+                "Напишите:\n"
+                "global\n"
+                "india\n"
+                "вьетнам"
+            )
+        else:
+            await update.message.reply_text("❌ Неверный код")
+        return
+
+    text_lower = text.lower()
+
+    if text_lower in GROUPS:
+        context.user_data["target"] = GROUPS[text_lower]
+
+        await update.message.reply_text(
+            f"✅ Отправьте пост для публикации в {text_lower}"
+        )
+        return
+
+    if text_lower in CHANNELS:
+        context.user_data["target"] = CHANNELS[text_lower]
+
+        await update.message.reply_text(
+            f"✅ Отправьте пост для публикации в {text_lower}"
+        )
+        return
+
+    target = context.user_data.get("target")
+
+    if target:
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "→ оставить заявку",
+                        "url": "https://t.me/dzen_exchange_bot"
+                    },
+                    {
+                        "text": "→ отзывы",
+                        "url": "https://t.me/DzenObmenGlobal/2"
+                    }
+                ]
+            ]
+        }
+
+        await context.bot.send_message(
+            chat_id=target,
+            text=text,
+            reply_markup=keyboard
+        )
+
+        await update.message.reply_text("✅ Пост опубликован")
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("BOT STARTED")
+
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
