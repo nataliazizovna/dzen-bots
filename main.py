@@ -1,6 +1,18 @@
 import os
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
 TOKEN = os.getenv("dzen_publications_bot")
 
@@ -15,92 +27,137 @@ user_state = {}
 user_target = {}
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [[KeyboardButton("📝 Создать пост")]],
+    [[KeyboardButton("📝 СОЗДАТЬ ПОСТ")]],
     resize_keyboard=True
 )
 
 CHANNELS_KEYBOARD = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("🇮🇳 Индия")],
-        [KeyboardButton("🇻🇳 Вьетнам")],
-        [KeyboardButton("🌍 Глобал")],
+        [KeyboardButton("🇮🇳 ИНДИЯ")],
+        [KeyboardButton("🇻🇳 ВЬЕТНАМ")],
+        [KeyboardButton("🌍 ГЛОБАЛ")],
     ],
     resize_keyboard=True
 )
 
-POST_KEYBOARD = InlineKeyboardMarkup([
-    [InlineKeyboardButton("➡️ ОСТАВИТЬ ЗАЯВКУ", url=APPLICATION_LINK)],
-    [InlineKeyboardButton("📣 ОТЗЫВЫ", url=REVIEWS_LINK)],
+POST_BUTTONS = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("ОСТАВИТЬ ЗАЯВКУ", url=APPLICATION_LINK),
+        InlineKeyboardButton("ОТЗЫВЫ", url=REVIEWS_LINK),
+    ]
 ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_state.clear()
+    user_id = update.effective_user.id
+    user_state[user_id] = None
+    user_target[user_id] = None
+
     await update.message.reply_text(
-        "✅ ДЗЕН ПУБЛИКАТОР\n\nНажмите «Создать пост».",
+        "✅ ДЗЕН ПУБЛИКАТОР\n\n"
+        "Нажмите кнопку ниже, чтобы создать новый пост.",
         reply_markup=MAIN_KEYBOARD
     )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text = update.message.text if update.message.text else ""
+    text = update.message.text or ""
 
-    if text == "📝 Создать пост":
+    if text == "📝 СОЗДАТЬ ПОСТ":
+        user_state[user_id] = "choose_channel"
+        user_target[user_id] = None
+
         await update.message.reply_text(
-            "✅ Куда опубликовать?",
+            "✅ Куда опубликовать пост?",
             reply_markup=CHANNELS_KEYBOARD
         )
         return
 
-    if text == "🇮🇳 Индия":
+    if text == "🇮🇳 ИНДИЯ":
         user_target[user_id] = INDIA_GROUP_ID
         user_state[user_id] = "waiting_post"
-        await update.message.reply_text("✅ Индия выбрана. Теперь отправьте пост.")
+
+        await update.message.reply_text(
+            "✅ Выбрана ИНДИЯ.\n\n"
+            "Теперь отправьте пост: текст, фото, видео или медиа с подписью."
+        )
         return
 
-    if text == "🇻🇳 Вьетнам":
+    if text == "🇻🇳 ВЬЕТНАМ":
         user_target[user_id] = VIETNAM_GROUP_ID
         user_state[user_id] = "waiting_post"
-        await update.message.reply_text("✅ Вьетнам выбран. Теперь отправьте пост.")
+
+        await update.message.reply_text(
+            "✅ Выбран ВЬЕТНАМ.\n\n"
+            "Теперь отправьте пост: текст, фото, видео или медиа с подписью."
+        )
         return
 
-    if text == "🌍 Глобал":
+    if text == "🌍 ГЛОБАЛ":
         user_target[user_id] = GLOBAL_CHANNEL
         user_state[user_id] = "waiting_post"
-        await update.message.reply_text("✅ Глобал выбран. Теперь отправьте пост.")
+
+        await update.message.reply_text(
+            "✅ Выбран ГЛОБАЛ.\n\n"
+            "Теперь отправьте пост: текст, фото, видео или медиа с подписью."
+        )
         return
 
     if user_state.get(user_id) == "waiting_post":
         target = user_target.get(user_id)
 
+        if not target:
+            await update.message.reply_text(
+                "❌ Сначала выберите канал.",
+                reply_markup=MAIN_KEYBOARD
+            )
+            return
+
         try:
             await context.bot.copy_message(
-    chat_id=target,
-    from_chat_id=update.message.chat_id,
-    message_id=update.message.message_id
-)
+                chat_id=target,
+                from_chat_id=update.message.chat_id,
+                message_id=update.message.message_id,
+                reply_markup=POST_BUTTONS
+            )
+
             user_state[user_id] = None
             user_target[user_id] = None
 
             await update.message.reply_text(
-                "✅ Опубликовано\n\nМожно создать следующий пост.",
+                "✅ ОПУБЛИКОВАНО\n\n"
+                "Можно создать следующий пост.",
                 reply_markup=MAIN_KEYBOARD
             )
 
         except Exception as e:
-            await update.message.reply_text(f"❌ Ошибка публикации:\n{e}")
+            user_state[user_id] = None
+            user_target[user_id] = None
+
+            await update.message.reply_text(
+                f"❌ ОШИБКА ПУБЛИКАЦИИ:\n{e}\n\n"
+                "Нажмите «СОЗДАТЬ ПОСТ» и попробуйте снова.",
+                reply_markup=MAIN_KEYBOARD
+            )
+
         return
 
     await update.message.reply_text(
-        "Нажмите «Создать пост».",
+        "Нажмите «СОЗДАТЬ ПОСТ».",
         reply_markup=MAIN_KEYBOARD
     )
 
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.ALL, handle_message))
+def main():
+    app = Application.builder().token(TOKEN).build()
 
-print("BOT STARTED")
-app.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.ALL, handle_message))
+
+    print("BOT STARTED")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
