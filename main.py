@@ -41,9 +41,8 @@ CHANNELS_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 POST_BUTTONS = InlineKeyboardMarkup([
-    [
-        InlineKeyboardButton("ОСТАВИТЬ ЗАЯВКУ", url=APPLICATION_LINK),
-        InlineKeyboardButton("ОТЗЫВЫ", url=REVIEWS_LINK),
+    [InlineKeyboardButton("ОСТАВИТЬ ЗАЯВКУ", url=APPLICATION_LINK)],
+    [InlineKeyboardButton("ОТЗЫВЫ", url=REVIEWS_LINK)],
     ]
 ])
 
