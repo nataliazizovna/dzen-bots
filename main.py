@@ -76,12 +76,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             await context.bot.copy_message(
-                chat_id=target,
-                from_chat_id=update.message.chat_id,
-                message_id=update.message.message_id,
-                reply_markup=POST_KEYBOARD
-            )
-
+    chat_id=target,
+    from_chat_id=update.message.chat_id,
+    message_id=update.message.message_id
+)
             user_state[user_id] = None
             user_target[user_id] = None
 
