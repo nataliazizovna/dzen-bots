@@ -1,106 +1,144 @@
-from telegram import Update
+import os
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
 
-import os
-
 TOKEN = os.getenv("dzen_publications_bot")
 
-ACCESS_CODE = "8381"
+INDIA_GROUP_ID = -1003261155661
+VIETNAM_GROUP_ID = -1003984357381
+GLOBAL_CHANNEL = "@DzenObmenGlobal"
 
-authorized_users = set()
+APPLICATION_LINK = "https://t.me/dzen_exchange_bot"
+REVIEWS_LINK = "https://t.me/DzenObmenGlobal/2"
 
-GROUPS = {
-    "india": -1003261155661,
-    "вьетнам": -1003984357381,
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton("Создать пост")]
+    ],
+    resize_keyboard=True
+)
+
+TARGET_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🇮🇳 Индия", callback_data="target_india")],
+    [InlineKeyboardButton("🇻🇳 Вьетнам", callback_data="target_vietnam")],
+    [InlineKeyboardButton("🌍 Глобал", callback_data="target_global")],
+])
+
+POST_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("→ ОСТАВИТЬ ЗАЯВКУ", url=APPLICATION_LINK)],
+    [InlineKeyboardButton("→ ОТЗЫВЫ", url=REVIEWS_LINK)],
+])
+
+TARGETS = {
+    "target_india": INDIA_GROUP_ID,
+    "target_vietnam": VIETNAM_GROUP_ID,
+    "target_global": GLOBAL_CHANNEL,
 }
 
-CHANNELS = {
-    "global": "@DzenObmenGlobal",
+TARGET_NAMES = {
+    "target_india": "Индия",
+    "target_vietnam": "Вьетнам",
+    "target_global": "Глобал",
 }
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     await update.message.reply_text(
-        "🔐 Введите код доступа:"
+        "✅ ДЗЕН ПУБЛИКАТОР\n\n"
+        "Нажмите «Создать пост», чтобы выбрать канал или группу для публикации.",
+        reply_markup=MAIN_KEYBOARD
     )
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
 
-    if user_id not in authorized_users:
-        if text == ACCESS_CODE:
-            authorized_users.add(user_id)
+async def create_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+    await update.message.reply_text(
+        "✅ Куда опубликовать пост?",
+        reply_markup=TARGET_KEYBOARD
+    )
 
-            await update.message.reply_text(
-                "✅ ДОСТУП РАЗРЕШЕН\n\n"
-                "Напишите:\n"
-                "global\n"
-                "india\n"
-                "вьетнам"
-            )
-        else:
-            await update.message.reply_text("❌ Неверный код")
+
+async def choose_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    target_key = query.data
+    context.user_data["target"] = TARGETS[target_key]
+    context.user_data["target_name"] = TARGET_NAMES[target_key]
+    context.user_data["waiting_post"] = True
+
+    await query.message.reply_text(
+        f"✅ Вы выбрали: {TARGET_NAMES[target_key]}\n\n"
+        "Теперь отправьте пост: текст, фото с подписью или другое сообщение."
+    )
+
+
+async def publish_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "Создать пост":
+        await create_post(update, context)
         return
 
-    text_lower = text.lower()
-
-    if text_lower in GROUPS:
-        context.user_data["target"] = GROUPS[text_lower]
-
+    if not context.user_data.get("waiting_post"):
         await update.message.reply_text(
-            f"✅ Отправьте пост для публикации в {text_lower}"
-        )
-        return
-
-    if text_lower in CHANNELS:
-        context.user_data["target"] = CHANNELS[text_lower]
-
-        await update.message.reply_text(
-            f"✅ Отправьте пост для публикации в {text_lower}"
+            "Нажмите «Создать пост», чтобы выбрать куда публиковать.",
+            reply_markup=MAIN_KEYBOARD
         )
         return
 
     target = context.user_data.get("target")
+    target_name = context.user_data.get("target_name")
 
-    if target:
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "→ оставить заявку",
-                        "url": "https://t.me/dzen_exchange_bot"
-                    },
-                    {
-                        "text": "→ отзывы",
-                        "url": "https://t.me/DzenObmenGlobal/2"
-                    }
-                ]
-            ]
-        }
-
-        await context.bot.send_message(
+    try:
+        await context.bot.copy_message(
             chat_id=target,
-            text=text,
-            reply_markup=keyboard
+            from_chat_id=update.message.chat_id,
+            message_id=update.message.message_id,
+            reply_markup=POST_KEYBOARD
         )
 
-        await update.message.reply_text("✅ Пост опубликован")
+        context.user_data.clear()
+
+        await update.message.reply_text(
+            f"✅ Опубликовано: {target_name}\n\n"
+            "Можно создать следующий пост.",
+            reply_markup=MAIN_KEYBOARD
+        )
+
+    except Exception as e:
+        context.user_data.clear()
+
+        await update.message.reply_text(
+            f"❌ Ошибка публикации:\n{e}\n\n"
+            "Попробуйте снова.",
+            reply_markup=MAIN_KEYBOARD
+        )
+
 
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.Regex("^Создать пост$"), create_post))
+    app.add_handler(CallbackQueryHandler(choose_target))
+    app.add_handler(MessageHandler(filters.ALL, publish_post))
 
-    print("BOT STARTED")
-
+    print("DZEN PUBLISHER BOT STARTED")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
