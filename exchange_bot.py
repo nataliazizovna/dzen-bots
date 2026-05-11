@@ -1,10 +1,12 @@
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler,
     CallbackQueryHandler, ContextTypes, MessageHandler, filters
 )
 
-TOKEN = "ВСТАВЬ_СЮДА_НОВЫЙ_ТОКЕН"
+
+TOKEN = os.getenv("dzen_exchange_bot")
 
 ADMIN_LINK = "https://t.me/+XFM8A0Le-sM2NWYy"
 REVIEWS_LINK = "https://t.me/DzenObmenGlobal/2"
